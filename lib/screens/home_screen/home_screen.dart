@@ -15,11 +15,6 @@ class HomeScreen extends StatelessWidget {
   static const Color _bg = Color(0xFFF1F7FD);
   static const Color _textMuted = Color(0xFF6B7F99);
 
-  static const CameraPosition _initialCameraPosition = CameraPosition(
-    target: LatLng(31.5204, 74.3587),
-    zoom: 12,
-  );
-
   Future<void> _handleImageSelection(
     BuildContext context,
     ImageSource source,
@@ -136,6 +131,16 @@ Consumer<WeatherProvider>(
             onSubmitted: (value) {
               weatherProv.fetchWeatherForCity(value);
             },
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: weatherProv.isLoading
+                  ? null
+                  : weatherProv.fetchWeatherForCurrentLocation,
+              icon: const Icon(Icons.my_location),
+              label: const Text('Use current location'),
+            ),
           ),
           const Divider(height: 24),
           if (weatherProv.isLoading)
@@ -393,16 +398,45 @@ Consumer<WeatherProvider>(
                     ),
                   ],
                 ),
-                child: GoogleMap(
-                  initialCameraPosition: _initialCameraPosition,
-                  zoomControlsEnabled: false,
-                  myLocationButtonEnabled: false,
-                  markers: {
-                    const Marker(
-                      markerId: MarkerId('current_location'),
-                      position: LatLng(31.5204, 74.3587),
-                      infoWindow: InfoWindow(title: 'AQI Monitoring Point'),
-                    ),
+                child: Consumer<WeatherProvider>(
+                  builder: (context, weatherProv, child) {
+                    final position = weatherProv.currentPosition;
+                    final location = position == null
+                        ? null
+                        : LatLng(position.latitude, position.longitude);
+
+                    if (location == null) {
+                      return Center(
+                        child: Text(
+                          weatherProv.isLoading
+                              ? 'Getting your current location...'
+                              : 'Current location is not available.',
+                          style: const TextStyle(color: _textMuted),
+                        ),
+                      );
+                    }
+
+                    return GoogleMap(
+                      key: ValueKey(
+                        '${location.latitude},${location.longitude}',
+                      ),
+                      initialCameraPosition: CameraPosition(
+                        target: location,
+                        zoom: 12,
+                      ),
+                      zoomControlsEnabled: false,
+                      myLocationButtonEnabled: false,
+                      markers: {
+                        Marker(
+                          markerId: const MarkerId('current_location'),
+                          position: location,
+                          infoWindow: InfoWindow(
+                            title: weatherProv.currentCityWeather?.cityName ??
+                                'Current location',
+                          ),
+                        ),
+                      },
+                    );
                   },
                 ),
               ),
