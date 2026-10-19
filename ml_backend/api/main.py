@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 import requests
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from fastapi import FastAPI, HTTPException, Query
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_PATH = BASE_DIR / "models" / "aqi_next_hour_model.joblib"
@@ -59,55 +60,85 @@ def predict_next_hour(data: PredictionInput):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 @app.get("/predict/live-next-hour")
-def predict_live_next_hour():
-    latitude = 31.5204
-    longitude = 74.3587
+
+@app.get("/predict/live-next-hour")
+def predict_live_next_hour(
+    city: str = Query(..., min_length=2, description="City name")
+):
     timezone = "Asia/Karachi"
 
+    geocoding_url = "https://geocoding-api.open-meteo.com/v1/search"
     weather_url = "https://api.open-meteo.com/v1/forecast"
     air_url = "https://air-quality-api.open-meteo.com/v1/air-quality"
 
-    weather_params = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "timezone": timezone,
-        "past_days": 1,
-        "forecast_days": 2,
-        "hourly": [
-            "temperature_2m",
-            "relative_humidity_2m",
-            "precipitation",
-            "cloud_cover",
-            "wind_speed_10m",
-            "pressure_msl",
-        ],
-    }
-
-    air_params = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "timezone": timezone,
-        "past_days": 1,
-        "forecast_days": 2,
-        "hourly": ["us_aqi"],
-    }
-
     try:
+        # 1. Search city and get coordinates
+        geo_response = requests.get(
+            geocoding_url,
+            params={
+                "name": city,
+                "count": 1,
+                "language": "en",
+                "format": "json",
+            },
+            timeout=20,
+        )
+        geo_response.raise_for_status()
+        places = geo_response.json().get("results", [])
+
+        if not places:
+            raise HTTPException(
+                status_code=404,
+                detail=f"City '{city}' was not found.",
+            )
+
+        place = places[0]
+        latitude = place["latitude"]
+        longitude = place["longitude"]
+        timezone = place.get("timezone") or "Asia/Karachi"
+
+        # 2. Fetch hourly weather data for selected city
+        common_params = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "timezone": timezone,
+            "past_days": 1,
+            "forecast_days": 2,
+        }
+
+        weather_params = {
+            **common_params,
+            "hourly": [
+                "temperature_2m",
+                "relative_humidity_2m",
+                "precipitation",
+                "cloud_cover",
+                "wind_speed_10m",
+                "pressure_msl",
+            ],
+        }
+
+        air_params = {
+            **common_params,
+            "hourly": ["us_aqi"],
+        }
+
         weather_response = requests.get(
             weather_url, params=weather_params, timeout=30
         )
         weather_response.raise_for_status()
-        weather = weather_response.json()["hourly"]
 
         air_response = requests.get(
             air_url, params=air_params, timeout=30
         )
         air_response.raise_for_status()
-        air = air_response.json()["hourly"]
 
-        weather_df = pd.DataFrame(weather)
-        air_df = pd.DataFrame(air)
+        weather_df = pd.DataFrame(
+            weather_response.json()["hourly"]
+        )
+        air_df = pd.DataFrame(air_response.json()["hourly"])
 
+        # 3. Merge weather and AQI using matching timestamps
         df = pd.merge(weather_df, air_df, on="time", how="inner")
         df["time"] = pd.to_datetime(df["time"])
         df["hour"] = df["time"].dt.hour
@@ -119,18 +150,18 @@ def predict_live_next_hour():
             minute=0, second=0, microsecond=0, tzinfo=None
         )
 
-        required = features
         valid = df[
             (df["time"] <= current_hour)
-            & df[required].notna().all(axis=1)
+            & df[features].notna().all(axis=1)
         ].sort_values("time")
 
         if valid.empty:
             raise HTTPException(
                 status_code=503,
-                detail="No complete hourly weather and AQI data available."
+                detail="No complete hourly data available for this city.",
             )
 
+        # 4. Use the latest complete hour as model input
         latest = valid.iloc[-1]
         input_time = latest["time"]
 
@@ -142,7 +173,9 @@ def predict_live_next_hour():
         prediction = float(model.predict(row)[0])
 
         return {
-            "location": "Lahore, Pakistan",
+            "location": f"{place['name']}, {place.get('country', '')}",
+            "latitude": latitude,
+            "longitude": longitude,
             "input_data_time": input_time.isoformat(),
             "forecast_for": (
                 input_time + timedelta(hours=1)
@@ -152,8 +185,8 @@ def predict_live_next_hour():
             "forecast_horizon": "next_hour",
             "source": "Open-Meteo hourly data",
             "note": (
-                "Experimental estimate, not a verified observation "
-                "or medical guidance."
+                "Experimental model estimate; not a verified "
+                "observation or medical guidance."
             ),
         }
 

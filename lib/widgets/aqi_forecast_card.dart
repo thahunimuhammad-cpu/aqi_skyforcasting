@@ -3,7 +3,12 @@ import 'package:flutter/material.dart';
 import '../services/aqi_api_service.dart';
 
 class AqiForecastCard extends StatefulWidget {
-  const AqiForecastCard({super.key});
+  const AqiForecastCard({
+    super.key,
+    required this.city,
+  });
+
+  final String city;
 
   @override
   State<AqiForecastCard> createState() => _AqiForecastCardState();
@@ -15,13 +20,29 @@ class _AqiForecastCardState extends State<AqiForecastCard> {
   @override
   void initState() {
     super.initState();
-    _forecast = AqiApiService.getLiveForecast();
+    _loadForecast();
+  }
+
+  @override
+  void didUpdateWidget(covariant AqiForecastCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.city.trim().toLowerCase() !=
+        widget.city.trim().toLowerCase()) {
+      _loadForecast();
+    }
+  }
+
+  void _loadForecast() {
+    final city = widget.city.trim();
+
+    _forecast = city.isEmpty
+        ? Future.error(Exception('Please select a city first.'))
+        : AqiApiService.getLiveForecast(city: city);
   }
 
   void _refresh() {
-    setState(() {
-      _forecast = AqiApiService.getLiveForecast();
-    });
+    setState(_loadForecast);
   }
 
   @override
@@ -64,9 +85,9 @@ class _AqiForecastCardState extends State<AqiForecastCard> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'Forecast load nahi ho saka. Internet aur Python API check karein.',
-                  style: TextStyle(color: Colors.red),
+                Text(
+                  'Forecast load nahi ho saka.\n${snapshot.error}',
+                  style: const TextStyle(color: Colors.red),
                 ),
                 Align(
                   alignment: Alignment.centerRight,
@@ -83,9 +104,10 @@ class _AqiForecastCardState extends State<AqiForecastCard> {
           final data = snapshot.data!;
           final currentAqi = data['current_aqi'];
           final predictedAqi = data['predicted_aqi'];
-          final location = data['location'] ?? 'Unknown location';
+          final location = data['location'] ?? widget.city;
           final forecastFor = data['forecast_for'] ?? '';
-          final note = data['note'] ?? 'Experimental forecast estimate.';
+          final note =
+              data['note'] ?? 'Experimental forecast estimate.';
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,

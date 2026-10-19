@@ -66,253 +66,155 @@ class HomeScreen extends StatelessWidget {
             children: [
               // Weather Card Section
              // home_screen.dart me Consumer<WeatherProvider> component:
-Consumer<WeatherProvider>(
-  builder: (context, weatherProv, child) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: _blue.withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Search Field Widget
-         // home_screen.dart me Consumer<WeatherProvider> component:
-Consumer<WeatherProvider>(
-  builder: (context, weatherProv, child) {
-    final TextEditingController searchController = TextEditingController();
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: _blue.withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Search Field Widget
-          TextField(
-            controller: searchController,
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(
-              hintText: 'Search city (e.g. Multan, London)...',
-              hintStyle: const TextStyle(color: _textMuted, fontSize: 14),
-              prefixIcon: const Icon(Icons.search, color: _blue),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.arrow_forward, color: _navy),
-                onPressed: () {
-                  FocusScope.of(context).unfocus();
-                  weatherProv.fetchWeatherForCity(searchController.text);
+              // Weather Search and Current AQI Card
+              Consumer<WeatherProvider>(
+                builder: (context, weatherProv, child) {
+                  final weather = weatherProv.currentCityWeather;
+
+                  return Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _blue.withValues(alpha: 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Check City Air Quality',
+                          style: TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.bold,
+                            color: _navy,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        const CitySearchField(),
+
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: weatherProv.isLoading
+                                ? null
+                                : weatherProv
+                                    .fetchWeatherForCurrentLocation,
+                            icon: const Icon(Icons.my_location),
+                            label: const Text('Use current location'),
+                          ),
+                        ),
+
+                        const Divider(height: 24),
+
+                        if (weatherProv.isLoading)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 20),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        else if (weatherProv.errorMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Text(
+                              weatherProv.errorMessage!,
+                              style: const TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          )
+                        else if (weather != null) ...[
+                          Text(
+                            weather.cityName,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: _navy,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: _bg,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Air Quality',
+                                  style: TextStyle(
+                                    color: _textMuted,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  weather.aqi > 0
+                                      ? weather.aqiCategory
+                                      : 'Unavailable',
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: _blue,
+                                  ),
+                                ),
+                                if (weather.aqi > 0)
+                                  Text(
+                                    'US EPA category index: ${weather.aqi}',
+                                    style: const TextStyle(
+                                      color: _textMuted,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+                          Text(
+                            'Weather: ${weather.status}',
+                            style: const TextStyle(
+                              color: _textMuted,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Humidity: ${weather.humidity}  |  '
+                            'Wind: ${weather.wind}',
+                            style: const TextStyle(
+                              color: _textMuted,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
                 },
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              filled: true,
-              fillColor: _bg,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none,
+           const SizedBox(height: 20),
+              Consumer<WeatherProvider>(
+                builder: (context, weatherProv, child) {
+                  final city = weatherProv.currentCityWeather?.cityName;
+                  return city == null
+                      ? const SizedBox.shrink()
+                      : AqiForecastCard(city: city);
+                },
               ),
-            ),
-            onSubmitted: (value) {
-              weatherProv.fetchWeatherForCity(value);
-            },
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: weatherProv.isLoading
-                  ? null
-                  : weatherProv.fetchWeatherForCurrentLocation,
-              icon: const Icon(Icons.my_location),
-              label: const Text('Use current location'),
-            ),
-          ),
-          const Divider(height: 24),
-          if (weatherProv.isLoading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: CircularProgressIndicator(),
-              ),
-            )
-          else if (weatherProv.errorMessage != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                weatherProv.errorMessage!,
-                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
-              ),
-            )
-          else if (weatherProv.currentCityWeather != null)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 5,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        weatherProv.currentCityWeather!.cityName,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: _navy,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Status: ${weatherProv.currentCityWeather!.status}',
-                        style: const TextStyle(
-                          color: _textMuted,
-                          fontSize: 13,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 6,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'AQI: ${weatherProv.currentCityWeather!.aqi}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _blue,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Humidity: ${weatherProv.currentCityWeather!.humidity} | Wind: ${weatherProv.currentCityWeather!.wind}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: _textMuted,
-                        ),
-                        textAlign: TextAlign.end,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  },
-),
-          const Divider(height: 24),
-          if (weatherProv.isLoading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: CircularProgressIndicator(),
-              ),
-            )
-          else if (weatherProv.errorMessage != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                weatherProv.errorMessage!,
-                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
-              ),
-            )
-          else if (weatherProv.currentCityWeather != null)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 5,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        weatherProv.currentCityWeather!.cityName,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: _navy,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Status: ${weatherProv.currentCityWeather!.status}',
-                        style: const TextStyle(
-                          color: _textMuted,
-                          fontSize: 13,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 6,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'AQI: ${weatherProv.currentCityWeather!.aqi}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _blue,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Humidity: ${weatherProv.currentCityWeather!.humidity} | Wind: ${weatherProv.currentCityWeather!.wind}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: _textMuted,
-                        ),
-                        textAlign: TextAlign.end,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  },
-),
-              const SizedBox(height: 24),
-
-              const SizedBox(height: 20),
-              const AqiForecastCard(),
               const SizedBox(height: 24),
 
               // Hero card
@@ -565,6 +467,68 @@ Consumer<WeatherProvider>(
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+
+class CitySearchField extends StatefulWidget {
+  const CitySearchField({super.key});
+
+  @override
+  State<CitySearchField> createState() => _CitySearchFieldState();
+}
+
+class _CitySearchFieldState extends State<CitySearchField> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _searchCity() {
+    FocusScope.of(context).unfocus();
+    context
+        .read<WeatherProvider>()
+        .fetchWeatherForCity(_controller.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      textInputAction: TextInputAction.search,
+      onSubmitted: (_) => _searchCity(),
+      decoration: InputDecoration(
+        hintText: 'Search city (e.g. Multan, Bhakkar)',
+        hintStyle: const TextStyle(
+          color: HomeScreen._textMuted,
+          fontSize: 13,
+        ),
+        prefixIcon: const Icon(
+          Icons.search,
+          color: HomeScreen._blue,
+        ),
+        suffixIcon: IconButton(
+          icon: const Icon(
+            Icons.arrow_forward,
+            color: HomeScreen._navy,
+          ),
+          onPressed: _searchCity,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        filled: true,
+        fillColor: HomeScreen._bg,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
         ),
       ),
     );
