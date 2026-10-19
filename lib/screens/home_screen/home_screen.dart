@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:aqi_forcasting/widgets/aqi_forecast_card.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -308,6 +309,10 @@ Consumer<WeatherProvider>(
     );
   },
 ),
+              const SizedBox(height: 24),
+
+              const SizedBox(height: 20),
+              const AqiForecastCard(),
               const SizedBox(height: 24),
 
               // Hero card
