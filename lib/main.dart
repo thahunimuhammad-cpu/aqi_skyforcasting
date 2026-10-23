@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aqi_forcasting/providers/auth_provider.dart';
@@ -6,8 +7,16 @@ import 'package:aqi_forcasting/providers/aqi_result_provider.dart';
 import 'package:aqi_forcasting/providers/scan_history_provider.dart';
 import 'package:aqi_forcasting/providers/weather_provider.dart';
 import 'package:aqi_forcasting/screens/splash_screen/splash_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(
     MultiProvider(
       providers: [
@@ -31,7 +40,9 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'SkyAQI',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1565C0)),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1565C0),
+        ),
         useMaterial3: true,
       ),
       home: const SkyAqiSplashScreen(),

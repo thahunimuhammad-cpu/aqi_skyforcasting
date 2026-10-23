@@ -1,9 +1,14 @@
-import 'package:aqi_forcasting/screens/home_screen/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../home_screen/home_screen.dart';
+import '../signup_screen/signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String? initialEmail;
+
+  const LoginScreen({super.key, this.initialEmail});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -11,14 +16,13 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  late final TextEditingController _emailController;
   final _passwordController = TextEditingController();
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
 
   bool _isPasswordVisible = false;
   bool _rememberMe = false;
-  bool _isLoading = false;
   String? _errorMessage;
 
   // Design tokens
@@ -30,10 +34,17 @@ class _LoginScreenState extends State<LoginScreen> {
   static const Color _textMuted = Color(0xFF6B7F99);
   static const Color _border = Color(0xFFDCE7F4);
   static const Color _error = Color(0xFFD32F2F);
+  static const Color _success = Color(0xFF2E7D32);
 
   static final RegExp _emailRegex = RegExp(
     r'^[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,}$',
   );
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail ?? '');
+  }
 
   @override
   void dispose() {
@@ -78,29 +89,45 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
-    try {
-      final email = _emailController.text.trim();
-      final password = _passwordController.text;
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
 
-      // Replace this stub with the app's real auth provider call when the
-      // authentication flow is connected.
-      await Future.delayed(const Duration(seconds: 1));
-      debugPrint('Login attempt for $email (${password.length} chars)');
+    final authProvider = context.read<AuthProvider>();
+    final result = await authProvider.login(email, password);
 
-      if (!mounted) return;
+    if (!mounted) return;
+
+    if (result.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: _success,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_outline, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  result.message,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),
       );
-    } catch (_) {
-      if (!mounted) return;
+    } else {
       setState(() {
-        _errorMessage =
-            'We could not sign you in. Check your email and password, then try again.';
+        _errorMessage = result.message;
       });
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -240,7 +267,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildForm() {
+  Widget _buildForm(bool isLoading) {
     return Form(
       key: _formKey,
       autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -249,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
           TextFormField(
             controller: _emailController,
             focusNode: _emailFocus,
-            enabled: !_isLoading,
+            enabled: !isLoading,
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
             autofillHints: const [AutofillHints.email],
@@ -268,7 +295,7 @@ class _LoginScreenState extends State<LoginScreen> {
           TextFormField(
             controller: _passwordController,
             focusNode: _passwordFocus,
-            enabled: !_isLoading,
+            enabled: !isLoading,
             obscureText: !_isPasswordVisible,
             textInputAction: TextInputAction.done,
             autofillHints: const [AutofillHints.password],
@@ -297,12 +324,12 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildOptionsRow() {
+  Widget _buildOptionsRow(bool isLoading) {
     return Row(
       children: [
         InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: _isLoading
+          onTap: isLoading
               ? null
               : () => setState(() => _rememberMe = !_rememberMe),
           child: Padding(
@@ -319,7 +346,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(5),
                     ),
-                    onChanged: _isLoading
+                    onChanged: isLoading
                         ? null
                         : (v) => setState(() => _rememberMe = v ?? false),
                   ),
@@ -335,7 +362,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const Spacer(),
         TextButton(
-          onPressed: _isLoading ? null : _showForgotPassword,
+          onPressed: isLoading ? null : _showForgotPassword,
           child: const Text(
             'Forgot password?',
             style: TextStyle(
@@ -349,7 +376,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildLoginButton() {
+  Widget _buildLoginButton(bool isLoading) {
     return SizedBox(
       height: 54,
       child: ElevatedButton(
@@ -361,8 +388,8 @@ class _LoginScreenState extends State<LoginScreen> {
             borderRadius: BorderRadius.circular(14),
           ),
         ),
-        onPressed: _isLoading ? null : _submit,
-        child: _isLoading
+        onPressed: isLoading ? null : _submit,
+        child: isLoading
             ? const SizedBox(
                 width: 22,
                 height: 22,
@@ -385,6 +412,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final isLoading = authProvider.isLoading;
+
     return Scaffold(
       backgroundColor: _bg,
       resizeToAvoidBottomInset: true,
@@ -437,11 +467,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 _buildErrorBanner(),
-                                _buildForm(),
+                                _buildForm(isLoading),
                                 const SizedBox(height: 8),
-                                _buildOptionsRow(),
+                                _buildOptionsRow(isLoading),
                                 const SizedBox(height: 16),
-                                _buildLoginButton(),
+                                _buildLoginButton(isLoading),
                               ],
                             ),
                           ),
@@ -455,7 +485,16 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: TextStyle(color: _textMuted, fontSize: 14),
                             ),
                             GestureDetector(
-                              onTap: _isLoading ? null : () {},
+                              onTap: isLoading
+                                  ? null
+                                  : () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const SignupScreen(),
+                                        ),
+                                      );
+                                    },
                               child: const Text(
                                 'Create one',
                                 style: TextStyle(
@@ -481,7 +520,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // -----------------------------------------------------------------------------
-// Forgot password dialog (own state so its controller is disposed correctly)
+// Forgot password dialog
 // -----------------------------------------------------------------------------
 class _ForgotPasswordDialog extends StatefulWidget {
   const _ForgotPasswordDialog({
@@ -495,8 +534,7 @@ class _ForgotPasswordDialog extends StatefulWidget {
     String? hint,
     required IconData icon,
     Widget? suffix,
-  })
-  decorationBuilder;
+  }) decorationBuilder;
 
   @override
   State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
@@ -526,13 +564,25 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
     setState(() => _sending = true);
 
     try {
-      // Replace this stub with the app's real password-reset API call when the
-      // authentication flow is connected.
-      await Future.delayed(const Duration(milliseconds: 800));
-      debugPrint('Password reset requested for $email');
+      final auth = context.read<AuthProvider>();
+      final result = await auth.sendPasswordReset(email);
 
       if (!mounted) return;
-      Navigator.pop(context, true);
+      if (result.success) {
+        Navigator.pop(context, true);
+      } else {
+        setState(() => _sending = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: _LoginScreenState._error,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            content: Text(result.message),
+          ),
+        );
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() => _sending = false);
@@ -623,13 +673,13 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                     color: Colors.white,
                   ),
                 )
-              : const Text(
-                  'Send link',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+            : const Text(
+                'Send link',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
                 ),
+              ),
         ),
       ],
     );

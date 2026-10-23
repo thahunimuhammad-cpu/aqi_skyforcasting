@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "357766697599",
+    "project_id": "aqi-forcasting-app",
+    "storage_bucket": "aqi-forcasting-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:357766697599:android:12f7f6044429e8cc61a54a",
+        "android_client_info": {
+          "package_name": "com.example.aqi_forcastig"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZVtoqIJmdwpZ6z1lPypxi4TRkaiRcHoQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

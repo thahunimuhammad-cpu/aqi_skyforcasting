@@ -1,5 +1,7 @@
+import 'package:aqi_forcasting/providers/auth_provider.dart';
 import 'package:aqi_forcasting/providers/sky_aqi_provider.dart';
 import 'package:aqi_forcasting/providers/weather_provider.dart';
+import 'package:aqi_forcasting/screens/login_screen/login_screen.dart';
 import 'package:aqi_forcasting/screens/photos_screen/photos.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -31,6 +33,62 @@ class HomeScreen extends StatelessWidget {
     }
   }
 
+  void _confirmLogout(BuildContext context) {
+    final auth = context.read<AuthProvider>();
+    final userName = auth.user?.name ?? 'User';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.cyan,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Colors.redAccent),
+            SizedBox(width: 10),
+            Text('Logout', style: TextStyle(fontWeight: FontWeight.w700)),
+          ],
+        ),
+        content: Text('Are you sure you want to log out, $userName?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: _textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<AuthProvider>().logout();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: Colors.redAccent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  content: const Text('Logged out successfully.'),
+                ),
+              );
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            child: const Text('Logout',style: TextStyle(color: Colors.black,fontWeight: FontWeight.w700),),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -45,7 +103,7 @@ class HomeScreen extends StatelessWidget {
             letterSpacing: 0.3,
           ),
         ),
-        centerTitle: true,
+        centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 0,
         flexibleSpace: Container(
@@ -57,16 +115,76 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
         ),
+        actions: [
+          Consumer<AuthProvider>(
+            builder: (context, auth, _) {
+              if (auth.isLoggedIn) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: TextButton.icon(
+                    onPressed: () => _confirmLogout(context),
+                    icon: const Icon(Icons.logout_rounded,
+                        color: Colors.white, size: 18),
+                    label: const Text(
+                      'Logout',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.18),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                );
+              } else {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: TextButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const LoginScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.login_rounded,
+                        color: Colors.white, size: 18),
+                    label: const Text(
+                      'Login',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.18),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(22, 22, 22, 28),
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Weather Card Section
-             // home_screen.dart me Consumer<WeatherProvider> component:
-
               // Weather Search and Current AQI Card
               Consumer<WeatherProvider>(
                 builder: (context, weatherProv, child) {
@@ -105,8 +223,7 @@ class HomeScreen extends StatelessWidget {
                           child: TextButton.icon(
                             onPressed: weatherProv.isLoading
                                 ? null
-                                : weatherProv
-                                    .fetchWeatherForCurrentLocation,
+                                : weatherProv.fetchWeatherForCurrentLocation,
                             icon: const Icon(Icons.my_location),
                             label: const Text('Use current location'),
                           ),
@@ -206,7 +323,7 @@ class HomeScreen extends StatelessWidget {
                   );
                 },
               ),
-           const SizedBox(height: 20),
+              const SizedBox(height: 20),
               Consumer<WeatherProvider>(
                 builder: (context, weatherProv, child) {
                   final city = weatherProv.currentCityWeather?.cityName;
@@ -472,7 +589,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
-
 
 class CitySearchField extends StatefulWidget {
   const CitySearchField({super.key});

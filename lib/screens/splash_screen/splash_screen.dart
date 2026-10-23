@@ -1,27 +1,31 @@
-import 'package:aqi_forcasting/screens/login_screen/login_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../home_screen/home_screen.dart';
+import '../signup_screen/signup_screen.dart';
+
 class SkyAqiSplashScreen extends StatefulWidget {
   const SkyAqiSplashScreen({super.key});
 
   @override
-  State<SkyAqiSplashScreen> createState() =>
-      _SkyAqiSplashScreenState();
+  State<SkyAqiSplashScreen> createState() => _SkyAqiSplashScreenState();
 }
 
-class _SkyAqiSplashScreenState
-    extends State<SkyAqiSplashScreen> {
-
+class _SkyAqiSplashScreenState extends State<SkyAqiSplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 6), () {
+    Future.delayed(const Duration(seconds: 4), () {
       if (!mounted) return;
+
+      final authProvider = context.read<AuthProvider>();
+      final Widget target = authProvider.isLoggedIn
+          ? const HomeScreen()
+          : const SignupScreen();
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (context) => const LoginScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => target),
       );
     });
   }
@@ -55,8 +59,7 @@ class _SkyAqiSplashScreenState
                   vertical: 16,
                 ),
                 child: Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'PAKISTAN AIR TELEMETRY',
