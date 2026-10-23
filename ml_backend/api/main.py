@@ -1,14 +1,18 @@
+
 from pathlib import Path
+import time
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import joblib
 import pandas as pd
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
 import requests
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 from fastapi import FastAPI, HTTPException, Query
+from pydantic import BaseModel, Field
 
+# -----------------------------
+# Model setup
+# -----------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_PATH = BASE_DIR / "models" / "aqi_next_hour_model.joblib"
 
@@ -17,6 +21,10 @@ model = saved["model"]
 features = saved["features"]
 
 app = FastAPI(title="AQI Forecast API", version="1.0.0")
+
+# Cache successful forecasts for 5 minutes
+forecast_cache = {}
+CACHE_TTL_SECONDS = 300
 
 
 class PredictionInput(BaseModel):
@@ -57,22 +65,45 @@ def predict_next_hour(data: PredictionInput):
             "model": "RandomForestRegressor",
             "note": "Experimental estimate; not for medical decisions.",
         }
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-@app.get("/predict/live-next-hour")
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Model prediction failed.",
+        )
+
 
 @app.get("/predict/live-next-hour")
 def predict_live_next_hour(
     city: str = Query(..., min_length=2, description="City name")
 ):
-    timezone = "Asia/Karachi"
+    city = city.strip()
 
-    geocoding_url = "https://geocoding-api.open-meteo.com/v1/search"
+    if not city:
+        raise HTTPException(
+            status_code=400,
+            detail="City name cannot be empty.",
+        )
+
+    # 1. Return cached result when still valid
+    cache_key = city.casefold()
+    cached = forecast_cache.get(cache_key)
+
+    if (
+        cached
+        and time.monotonic() - cached["time"] < CACHE_TTL_SECONDS
+    ):
+        return cached["data"]
+
+    geocoding_url = (
+        "https://geocoding-api.open-meteo.com/v1/search"
+    )
     weather_url = "https://api.open-meteo.com/v1/forecast"
-    air_url = "https://air-quality-api.open-meteo.com/v1/air-quality"
+    air_url = (
+        "https://air-quality-api.open-meteo.com/v1/air-quality"
+    )
 
     try:
-        # 1. Search city and get coordinates
+        # 2. Find city coordinates
         geo_response = requests.get(
             geocoding_url,
             params={
@@ -81,9 +112,10 @@ def predict_live_next_hour(
                 "language": "en",
                 "format": "json",
             },
-            timeout=20,
+            timeout=(5, 10),
         )
         geo_response.raise_for_status()
+
         places = geo_response.json().get("results", [])
 
         if not places:
@@ -97,7 +129,7 @@ def predict_live_next_hour(
         longitude = place["longitude"]
         timezone = place.get("timezone") or "Asia/Karachi"
 
-        # 2. Fetch hourly weather data for selected city
+        # 3. Request hourly weather and AQI data
         common_params = {
             "latitude": latitude,
             "longitude": longitude,
@@ -124,22 +156,34 @@ def predict_live_next_hour(
         }
 
         weather_response = requests.get(
-            weather_url, params=weather_params, timeout=30
+            weather_url,
+            params=weather_params,
+            timeout=(5, 15),
         )
         weather_response.raise_for_status()
 
         air_response = requests.get(
-            air_url, params=air_params, timeout=30
+            air_url,
+            params=air_params,
+            timeout=(5, 15),
         )
         air_response.raise_for_status()
 
         weather_df = pd.DataFrame(
             weather_response.json()["hourly"]
         )
-        air_df = pd.DataFrame(air_response.json()["hourly"])
+        air_df = pd.DataFrame(
+            air_response.json()["hourly"]
+        )
 
-        # 3. Merge weather and AQI using matching timestamps
-        df = pd.merge(weather_df, air_df, on="time", how="inner")
+        # 4. Match weather and AQI by timestamp
+        df = pd.merge(
+            weather_df,
+            air_df,
+            on="time",
+            how="inner",
+        )
+
         df["time"] = pd.to_datetime(df["time"])
         df["hour"] = df["time"].dt.hour
         df["day_of_week"] = df["time"].dt.dayofweek
@@ -147,7 +191,10 @@ def predict_live_next_hour(
 
         now = datetime.now(ZoneInfo(timezone))
         current_hour = now.replace(
-            minute=0, second=0, microsecond=0, tzinfo=None
+            minute=0,
+            second=0,
+            microsecond=0,
+            tzinfo=None,
         )
 
         valid = df[
@@ -161,7 +208,7 @@ def predict_live_next_hour(
                 detail="No complete hourly data available for this city.",
             )
 
-        # 4. Use the latest complete hour as model input
+        # 5. Predict the next-hour AQI
         latest = valid.iloc[-1]
         input_time = latest["time"]
 
@@ -172,8 +219,10 @@ def predict_live_next_hour(
 
         prediction = float(model.predict(row)[0])
 
-        return {
-            "location": f"{place['name']}, {place.get('country', '')}",
+        result = {
+            "location": (
+                f"{place['name']}, {place.get('country', '')}"
+            ),
             "latitude": latitude,
             "longitude": longitude,
             "input_data_time": input_time.isoformat(),
@@ -190,13 +239,42 @@ def predict_live_next_hour(
             ),
         }
 
+        # 6. Cache only successful forecasts
+        forecast_cache[cache_key] = {
+            "time": time.monotonic(),
+            "data": result,
+        }
+
+        return result
+
     except HTTPException:
         raise
-    except requests.RequestException as exc:
+
+    except requests.Timeout:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "Weather/AQI service timed out. "
+                "Please retry shortly."
+            ),
+        )
+
+    except requests.RequestException:
         raise HTTPException(
             status_code=502,
-            detail=f"Weather/AQI data service error: {exc}",
+            detail=(
+                "Weather/AQI data service is temporarily unavailable."
+            ),
         )
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
 
+    except (KeyError, ValueError, TypeError):
+        raise HTTPException(
+            status_code=502,
+            detail="Weather/AQI service returned invalid data.",
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unexpected error while generating AQI forecast.",
+        )
